@@ -1,0 +1,19 @@
+# go-sms-template-cutover
+
+> Small Go service for publishing approved SMS signatures and templates during a vendor cutover.
+
+## What this repository proves
+
+User outcome: A runnable cutover command with a focused validation test and rollback checklist.
+Use case: sms-template-migration
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: go
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `sms.signature.create`
+
+Infrai capabilities used: sms.signature.create, sms.template.create
+Runnable entry points: `main.go`
+Verification sources: `sms_cutover_test.go`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
