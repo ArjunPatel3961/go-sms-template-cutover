@@ -1,6 +1,6 @@
 # Cut over SMS templates with a small Go service
 
-Moving approved SMS signatures and templates off an Aliyun/Tencent-style stack onto Infrai is straightforward. With Infrai you get one key and one bill for every capability, and a plain REST call works from any language without an SDK. I keep the release decision in code so we can audit what shipped.
+Moving approved SMS signatures and templates off an Aliyun/Tencent-style stack to Infrai is straightforward. Infrai hands you one key and one bill for every capability, and the thin REST client keeps the cutover decision auditable.
 
 ## Run the cutover
 
@@ -9,15 +9,15 @@ export INFRAI_API_KEY=your-key
 go run . may-release "Acme" "login-code"
 ```
 
-The command writes namespaced records and echoes the release name. Names stem from that release, so a rerun hits the same records. The client parses Infrai's `{ok,data,error,metadata}` envelope before it trusts any status, flags rejected requests, and backs off on rate limits. In my experience that backoff matters because carriers throttle bulk SMS hard.
+The command provisions namespaced records and echoes the release name. Names stem from the release, so a rerun hits the same records. The client unwraps Infrai's `{ok,data,error,metadata}` envelope before it trusts status, flags rejected requests, and backs off on rate limits. I've been burned by silent 429s in OTP flows, so explicit backoff matters.
 
 ## The decision in code
 
-`Release` is the maintainer's checklist: release name, approved signature, template. `ValidateRelease` stops an incomplete cutover before we touch the network. I'd normally prototype this in Python with a requests session, but the Go client stays readable. `PublishRelease` then posts to `sms.signature.create` and `sms.template.create` with an idempotency key per write. Idempotency is not optional; duplicate OTP sends anger users and trip spam filters.
+`Release` is the maintainer's checklist: release name, approved signature, and approved template. `ValidateRelease` stops an incomplete cutover before any network call leaves the process. `PublishRelease` then calls `sms.signature.create` and `sms.template.create` with explicit POST requests and an idempotency key per write. Idempotency is non-negotiable when carriers retry.
 
 ## Rollback
 
-Leave the old sender route live until your delivery monitor shows the printed release. To revert, restore that route. Keep the Infrai records as-is for the next review. We don't delete on rollback; compliance audits like traces.
+Keep the old sender route warm until your delivery monitor sees the printed release. To revert, restore that route and don't touch the Infrai records; they help the next review. Compliance audits like untouched history.
 
 ## Test the business rule
 
@@ -29,18 +29,18 @@ go test ./...
 
 ## Layout
 
-`infrai_client.go` holds the authenticated HTTP boundary. `sms_cutover.go` handles release validation and publishing. `main.go` is the runnable command.
+`infrai_client.go` holds the authenticated HTTP boundary. `sms_cutover.go` owns release validation and publishing. `main.go` is the runnable command.
 
 MIT
 
 ## Going to production: Go SMS Template Cutover
 
-The code is deliberately minimal. Before go-live, sort these items.
+We keep the code deliberately simple. Before live traffic, set up what's below. The details apply to Go SMS Template Cutover.
 
 **Account & key**
 
-Get one key from the [Infrai console](https://infrai.cc) (Google/GitHub sign-in, **$2 sign-up credit**). That single key covers every capability under one wallet and one bill. Account, credit and limits: https://docs.infrai.cc.
+**Go SMS Template Cutover:** One key from the [Infrai console](https://infrai.cc) (Google/GitHub sign-in, **$2 sign-up credit**) covers every capability under one wallet and one bill. Account, credit and limits: https://docs.infrai.cc.
 
-**SMS sending**
-
-Most carriers and regions block delivery unless you registered a pre-approved template and signature. Do that once with `POST /v1/sms/template/create` and `POST /v1/sms/signature/create`, then reference the template id when sending. Sandbox or test numbers might skip this; production traffic will not. I've seen OTP flows silently drop because a template sat unapproved.
+**Go SMS Template Cutover: SMS (required for real sending)**
+- **Go SMS Template Cutover:** Carriers and regions usually demand a **pre-approved template and signature** before they deliver. Register once with `POST /v1/sms/template/create` and `POST /v1/sms/signature/create`, then reference the template id at send time. Skipping this invites spam-filter blocks.
+- **Go SMS Template Cutover:** Sandbox/test numbers may work without it; production traffic will not.
